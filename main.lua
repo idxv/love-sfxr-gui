@@ -58,7 +58,7 @@ function playsound()
     end
 
     --local t = love.timer.getTime()
-    local tab = sound:generateTable(sfxr.FREQ_44100, sfxr.BITS_FLOAT)
+    local tab = sound:generateTable()
     --t = love.timer.getTime() - t
     --statistics.generation = math.floor(t * 10000) / 10
 
@@ -488,51 +488,63 @@ love.load = function()
 	
 	width = width - 2 * pad
 	
-	local saveaction = function(name, ext, method, ...)
-		local filename = name .. ext
-		local file = love.filesystem.newFile(filename)
-		local ok, message = file:open("w")
+	local actions = {
+		sfxr = {format = "%s.sfxr", save = "saveBinary", load = "loadBinary"},
+		lua  = {format = "%s.lua",  save = "save", load = "load"},
+		wave = {format = "%s.wav",  save = "exportWAV"},
+	}
+	local saveaction = function(name, action_name, ...)
+		action = actions[action_name]
+		local filename = action.format:format(name)
+		local file = sound[action.save](sound, file, ...)
+		local ok, message = love.filesystem.write(filename, file)
 		if ok then
-			sound[method](sound, file, ...)
-			file:close()
 			message = string.format("Saved as %s/%s", love.filesystem.getSaveDirectory(), filename)
+			if action_name == "wave" then
+				--print(filename)
+				--local s = love.audio.newSource(filename, "static")
+				--s:play()
+			end
 		end
 		insert_message(message)
 	end
-	
-	button = gui:button("Save Lua", pos(x + pad, 0, width, unit), gp)
-	button.click = function(this)
-		saveaction(filein.value, ".lua", "save")
-	end
-	
-	button = gui:button("Load Lua", pos(x + pad, 0, width, unit), gp)
-	button.click = function(this)
-		insert_message("Please buy the full version to unlock this feature")
-	end
-	
-	button = gui:button("Save Binary", pos(x + pad, 0, width, unit), gp)
-	button.click = function(this)
-		saveaction(filein.value, ".sfxr", "saveBinary")
-	end
-	
-	button = gui:button("Load Binary", pos(x + pad, 0, width, unit), gp)
-	button.click = function(this)
-		local filename = filein.value .. ".sfxr"
-		local file = love.filesystem.newFile(filename)
-		local ok, message = file:open("r")
-		if ok then
-			sound["loadBinary"](sound, file)
-			file:close()
-			message = string.format("Saved as %s/%s", love.filesystem.getSaveDirectory(), filename)
+
+	local loadaction = function(name, action_name, ...)
+		action = actions[action_name]
+		local filename = action.format:format(name)
+		local file, message = love.filesystem.read(filename)
+		if file then
+			sound[action.load](sound, file)
+			message = string.format("Loaded %s/%s", love.filesystem.getSaveDirectory(), filename)
 			paramsgp:updatevalues()
 			playsound()
 		end
 		insert_message(message)
 	end
 	
+	button = gui:button("Save Lua", pos(x + pad, 0, width, unit), gp)
+	button.click = function(this)
+		saveaction(filein.value, "lua")
+	end
+	
+	button = gui:button("Load Lua", pos(x + pad, 0, width, unit), gp)
+	button.click = function(this)
+		loadaction(filein.value, "lua")
+	end
+	
+	button = gui:button("Save Binary", pos(x + pad, 0, width, unit), gp)
+	button.click = function(this)
+		saveaction(filein.value, "sfxr")
+	end
+	
+	button = gui:button("Load Binary", pos(x + pad, 0, width, unit), gp)
+	button.click = function(this)
+		loadaction(filein.value, "sfxr")
+	end
+	
 	button = gui:button("Export Wav", pos(x + pad, 0, width, unit), gp)
 	button.click = function(this)
-		saveaction(filein.value, ".wav", "exportWAV")
+		saveaction(filein.value, "wave")
 	end
 	
 	gp:verticaltile()
